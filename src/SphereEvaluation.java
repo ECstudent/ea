@@ -63,17 +63,14 @@ public class SphereEvaluation implements ContestEvaluation {
 		return new Double(f);
 	}
 
-	@Override
 	public Object getData(Object arg0) {
 		return null;
 	}
 
-	@Override
 	public double getFinalResult() {
 		return best_;
 	}
 
-	@Override
 	public Properties getProperties() {
 		Properties props = new Properties();
 		props.put("Multimodal", multimodal_);

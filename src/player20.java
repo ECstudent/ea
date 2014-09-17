@@ -61,15 +61,42 @@ public class player20 implements ContestSubmission {
 
 		Double fitness = 0.0;
 
+		List<Double> population_fitness = new ArrayList<Double>();
+		
 		// Initialize population
 		List<List<Double>> population = new ArrayList<List<Double>>();
 		for (int j = 0; j < population_size; j++) {
 			for (int i = 0; i < 10; i++) {
 				population.get(j).add(-5 + (10 * rnd_.nextDouble()));
 			}
+			fitness = (Double)evaluation_.evaluate(population.get(j));
+			population_fitness.add(fitness);
 			System.out.println("Fitness of candidate " + j + " is: "
-					+ evaluation_.evaluate(population.get(j)));
+					+ fitness);
+			
 		}
+		
+		//parent selection
+		List<Double> parent1 = population.get(0);
+		List<Double> parent2 = population.get(1);
+		
+		//Variation operators
+		//Recombination
+		List<Double> child1 = new ArrayList<Double>();
+		List<Double> child2 = new ArrayList<Double>();
+		
+		for (int i = 0; i < 10; i++) {
+			if (i < 5) {
+				child1.add(parent1.get(i));
+				child2.add(parent2.get(i));
+			} else {
+				child1.add(parent2.get(i));
+				child2.add(parent1.get(i));
+			}
+		}
+		
+		//survivor selection
+		
 
 	}
 
