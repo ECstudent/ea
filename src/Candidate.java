@@ -64,17 +64,18 @@ public class Candidate implements Comparable<Candidate> {
 	}
 
 	@Override
-	public int compareTo(Candidate c) {
-		if (this.fitness_ > c.fitness_) {
-			return 1;
-		} else {
-			return 0;
-		}
-	}
-
-	@Override
 	public String toString() {
 		return "Candidate fitness: " + fitness_;
+	}
+
+	/**
+	 * Sorted in such a way that the first entry in the list has the highest
+	 * fitness
+	 */
+	// @Override
+	public int compareTo(Candidate c) {
+		return this.fitness_ > c.fitness_ ? -1 : this.fitness_ < c.fitness_ ? 1
+				: 0;
 	}
 
 }

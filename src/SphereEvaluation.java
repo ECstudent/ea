@@ -1,7 +1,7 @@
 import java.util.Properties;
 import org.vu.contest.ContestEvaluation;
 
-// This is an example evalation. It is based on the standard sphere function. It is a maximization problem with a maximum of 10 for 
+// This is an example evaluation. It is based on the standard sphere function. It is a maximization problem with a maximum of 10 for 
 //  	vector x=0.
 // The sphere function itself is for minimization with minimum at 0, thus fitness is calculated as Fitness = 10 - 10*(f-fbest), 
 //  	where f is the result of the sphere function
@@ -42,7 +42,7 @@ public class SphereEvaluation implements ContestEvaluation {
 		return sum;
 	}
 
-	@Override
+	// @Override
 	public Object evaluate(Object result) {
 		// Check argument
 		if (!(result instanceof double[]))
@@ -64,17 +64,17 @@ public class SphereEvaluation implements ContestEvaluation {
 		return new Double(f);
 	}
 
-	@Override
+	// @Override
 	public Object getData(Object arg0) {
 		return null;
 	}
 
-	@Override
+	// @Override
 	public double getFinalResult() {
 		return best_;
 	}
 
-	@Override
+	// @Override
 	public Properties getProperties() {
 		Properties props = new Properties();
 		props.put("Multimodal", multimodal_);
