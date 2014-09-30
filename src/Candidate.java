@@ -1,5 +1,3 @@
-import java.util.List;
-import java.util.ArrayList;
 import java.util.Random;
 
 import org.vu.contest.ContestEvaluation;
@@ -74,7 +72,7 @@ public class Candidate implements Comparable<Candidate> {
 	 */
 	// @Override
 	public int compareTo(Candidate c) {
-		return this.fitness_ > c.fitness_ ? -1 : this.fitness_ < c.fitness_ ? 1
+		return this.fitness_ < c.fitness_ ? -1 : this.fitness_ > c.fitness_ ? 1
 				: 0;
 	}
 

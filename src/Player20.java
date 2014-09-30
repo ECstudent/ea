@@ -13,28 +13,35 @@ public class Player20 implements ContestSubmission {
 	ContestEvaluation evaluation_;
 	ExcelFile ef;
 	public int evals_;
+	private int dimensions_;
 	private int generation_;
 	private int evaluations_limit_;
 	private int population_size_;
-	private final int dimensions_ = 10;
 	private List<Candidate> population_;
+	private List<Double> probs_;
+	private List<Double> rwprobs_;
+	private boolean isMultimodal_;
+	private boolean isSeparable_;
+	private boolean hasStructure_;
 
 	public Player20() {
 		population_ = new ArrayList<Candidate>();
+		probs_ = new ArrayList<Double>();
+		rwprobs_ = new ArrayList<Double>();
 		rnd_ = new Random();
-		ef = new ExcelFile("AlgorithmResults.xls");
-		ef.createWorksheet("SphereEvaluation");
-		ef.addLabel("SphereEvaluation", 5, 2, "It works!");
-		ef.addNumber("SphereEvaluation", 6, 2, 12345.6789);
-		ef.close();
+		// ef = new ExcelFile("AlgorithmResults.xls");
+		// ef.createWorksheet("SphereEvaluation");
+		// ef.addLabel("SphereEvaluation", 5, 2, "It works!");
+		// ef.addNumber("SphereEvaluation", 6, 2, 12345.6789);
+		// ef.close();
 	}
 
 	public static void main(String[] args) {
 		// Initialize population
-		Player20 p = new Player20();
-		//p.setSeed(System.nanoTime());
-		//p.setEvaluation(new SphereEvaluation());
-		//p.run();
+		// Player20 p = new Player20();
+		// p.setSeed(System.nanoTime());
+		// p.setEvaluation(new SphereEvaluation());
+		// p.run();
 	}
 
 	public void setSeed(long seed) {
@@ -49,35 +56,59 @@ public class Player20 implements ContestSubmission {
 		// Get evaluation properties
 		Properties props = evaluation.getProperties();
 		evaluations_limit_ = Integer.parseInt(props.getProperty("Evaluations"));
-		boolean isMultimodal = Boolean.parseBoolean(props
-				.getProperty("Multimodal"));
-		boolean hasStructure = Boolean.parseBoolean(props
+		isMultimodal_ = Boolean.parseBoolean(props.getProperty("Multimodal"));
+		hasStructure_ = Boolean.parseBoolean(props
 				.getProperty("GlobalStructure"));
-		boolean isSeparable = Boolean.parseBoolean(props
-				.getProperty("Separable"));
+		isSeparable_ = Boolean.parseBoolean(props.getProperty("Separable"));
 
 		// Change settings(?)
-		if (isMultimodal) {
+		if (isMultimodal_) {
+			population_size_ = 100;
 		} else {
+			population_size_ = 2;
 		}
-		if (hasStructure) {
-		} else {
+		if (hasStructure_) {
 		}
-		if (isSeparable) {
-		} else {
+		if (isSeparable_) {
 		}
 
 	}
 
 	private List<Candidate> selectParents() {
+
+		int index = 0;
+		int inner = 0;
+		int numParents = 2;
+		double r = 0.0;
 		List<Candidate> parents = null;
+
 		try {
 			// select parents from population
 			Collections.sort(population_);
 			parents = new ArrayList<Candidate>();
-			// Retrieve the two best candidates
-			parents.add(population_.get(0));
-			parents.add(population_.get(1));
+
+			// Using roulette wheel selection
+			// while (index < numParents/* population_size_ */) {
+			// r = rnd_.nextDouble();
+			// inner = 0;
+			// while (rwprobs_.get(inner) < r) {
+			// inner++;
+			// }
+			// parents.add(population_.get(inner));
+			// index++;
+			// }
+
+			// Using stochastic universal sampling
+			r = (1.0 / population_size_) * rnd_.nextDouble();
+			while (index < numParents) {
+				while (r <= rwprobs_.get(inner)) {
+					parents.add(population_.get(inner));
+					r += (1.0 / population_size_);
+					index++;
+				}
+				inner++;
+			}
+
 		} catch (Exception e) {
 			System.err.println("Exception e: " + e.getLocalizedMessage());
 		}
@@ -88,38 +119,34 @@ public class Player20 implements ContestSubmission {
 		List<Candidate> children = null;
 		try {
 			// select children from population
-			// Recombination
 			double[] child1 = new double[dimensions_];
 			double[] child2 = new double[dimensions_];
 			double[] parent1 = parents.get(0).getParameters();
 			double[] parent2 = parents.get(1).getParameters();
+			// double dynMut = 1.0 - ((double) evals_ / evaluations_limit_);
+			// adapt depending on fitness?
+			// double convDynMut = 0.1 + (0.8 * dynMut);
 
+			// Recombination
 			// classic crossover
 			for (int index = 0; index < dimensions_; index++) {
-				if (index < dimensions_ / 2) {
+				if (rnd_.nextDouble() < 0.5) {
 					child1[index] = parent1[index];
-					child2[index] = parent2[index + (dimensions_ / 2)];
+					child2[index] = parent2[index];
 				} else {
 					child1[index] = parent2[index];
-					child2[index] = parent1[index - (dimensions_ / 2)];
+					child2[index] = parent1[index];
 				}
 			}
 
 			// mutation
-			// perform mutation on child1 50% chance
-			if (rnd_.nextDouble() < 0.5) {
-				int gene = rnd_.nextInt(10);
-				child1[gene] = -5 + (10 * rnd_.nextDouble());
-			} else {
-				// no mutation takes place
-			}
-
-			// perform mutation on child2 50% chance
-			if (rnd_.nextDouble() < 0.5) {
-				int gene = rnd_.nextInt(10);
-				child2[gene] = -5 + (10 * rnd_.nextDouble());
-			} else {
-				// no mutation takes place
+			for (int index = 0; index < dimensions_; index++) {
+				if (rnd_.nextDouble() < 0.1) {
+					child1[index] = -5 + (10 * rnd_.nextDouble());
+				}
+				if (rnd_.nextDouble() < 0.1) {
+					child2[index] = -5 + (10 * rnd_.nextDouble());
+				}
 			}
 
 			children = new ArrayList<Candidate>();
@@ -142,7 +169,7 @@ public class Player20 implements ContestSubmission {
 			Collections.sort(population_);
 			// Remove the two(!) candidates with the lowest fitness
 			while (population_.size() > population_size_) {
-				population_.remove(population_.size() - 1);
+				population_.remove(0);
 			}
 		} catch (Exception e) {
 			System.err.println("Exception e: " + e.getLocalizedMessage());
@@ -150,32 +177,47 @@ public class Player20 implements ContestSubmission {
 	}
 
 	private void evaluatePopulation() {
-		try {
-			double sum = 0.0;
-			for (Candidate c : population_) {
-				sum += c.getFitness();
-			}
-			System.out.println("Average fitness of generation " + generation_
-					+ " is: " + (sum / population_.size()));
-		} catch (Exception e) {
-			System.err.println("Exception e: " + e.getLocalizedMessage());
-		}
+		// try {
+		// double sum = 0.0;
+		//
+		// for (Candidate c : population_) {
+		// sum += c.getFitness();
+		// }
+		// System.out.println("Average fitness of generation " + generation_
+		// + " is: " + (sum / population_size_));
+		//
+		// } catch (Exception e) {
+		// System.err.println("Exception e: " + e.getLocalizedMessage());
+		// }
 	}
 
 	public void run() {
 		// Run your algorithm here
-		population_size_ = 10;
+		dimensions_ = 10;
 		generation_ = 1;
 		evals_ = 0;
 
-		// Initialize population
+		double mu = population_size_;
+		double p = 0.0;
+		double s = 1.5;
+		double pcumul = 0.0;
+
+		// Initialize population and selection probability distribution
 		for (int index = 0; index < population_size_; index++) {
 			population_.add(new Candidate(evaluation_, generation_, this));
+			// Ranking selection
+			p = ((2 - s) / mu) + ((2 * index * (s - 1)) / (mu * (mu - 1)));
+			probs_.add(p);
+			pcumul = 0.0;
+			for (Double d : probs_) {
+				pcumul += d;
+			}
+			rwprobs_.add(pcumul);
 		}
 
-		while (/* generation_ < 100 && */evals_ < evaluations_limit_) {
+		while (/* generation_ < 10 */evals_ < evaluations_limit_) {
 
-			evaluatePopulation();
+			 evaluatePopulation();
 
 			// parent selection
 			List<Candidate> parents = selectParents();
