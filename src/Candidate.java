@@ -19,7 +19,7 @@ public class Candidate implements Comparable<Candidate> {
 	 * @param evaluation
 	 * @param generation
 	 */
-	public Candidate(ContestEvaluation evaluation, int generation, Player20 p) {
+	public Candidate(ContestEvaluation evaluation, int generation, player20 p) {
 		evaluation_ = evaluation;
 		generation_ = generation;
 		parameters_ = new double[dimensions_];
@@ -40,7 +40,7 @@ public class Candidate implements Comparable<Candidate> {
 	 * @param generation
 	 * @param parameters
 	 */
-	public Candidate(ContestEvaluation evaluation, int generation, Player20 p,
+	public Candidate(ContestEvaluation evaluation, int generation, player20 p,
 			double[] parameters) {
 		evaluation_ = evaluation;
 		generation_ = generation;
@@ -67,7 +67,7 @@ public class Candidate implements Comparable<Candidate> {
 	}
 
 	/**
-	 * Sorted in such a way that the first entry in the list has the highest
+	 * Sorted in such a way that the last entry in the list has the highest
 	 * fitness
 	 */
 	// @Override
