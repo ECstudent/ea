@@ -18,8 +18,10 @@ public class player20 implements ContestSubmission {
 	private int generation_;
 	private int evaluations_limit_;
 	private int population_size_;
-	// private double mutRate_;
+	private double stDev_;
+	private double prevAvgFitness_;
 	private double avgFitness_;
+	private boolean singleMut_;
 	private List<Candidate> population_;
 	private List<Double> probs_;
 	private List<Double> rwprobs_;
@@ -32,13 +34,15 @@ public class player20 implements ContestSubmission {
 		// evaluation_; is set in setEvaluation
 		// ExcelFile ef; unused
 		evals_ = 0;
-		numParents_ = 3;
+		numParents_ = 2;
 		dimensions_ = 10;
 		generation_ = 1;
 		// evaluations_limit_; is set in setEvaluation
 		// population_size_; is set in setEvaluation
-		// mutRate_ = 0.0; unused
+		// stDev_; is set in initializePopulation
+		// prevAvgFitness_; is set in initializePopulation
 		// avgFitness_; is set in initializePopulation
+		singleMut_ = false;
 		population_ = new ArrayList<Candidate>();
 		probs_ = new ArrayList<Double>();
 		rwprobs_ = new ArrayList<Double>();
@@ -49,10 +53,10 @@ public class player20 implements ContestSubmission {
 
 	public static void main(String[] args) {
 		// Initialize population
-		// player20 p = new player20();
-		// p.setSeed(System.nanoTime());
-		// p.setEvaluation(new SphereEvaluation());
-		// p.run();
+		player20 p = new player20();
+		p.setSeed(System.nanoTime());
+		p.setEvaluation(new SphereEvaluation());
+		p.run();
 	}
 
 	public void setSeed(long seed) {
@@ -76,7 +80,7 @@ public class player20 implements ContestSubmission {
 		if (isMultimodal_) {
 			population_size_ = 100;
 		} else {
-			population_size_ = numParents_;
+			population_size_ = numParents_ * 2;
 		}
 		if (hasStructure_) {
 		}
@@ -105,6 +109,8 @@ public class player20 implements ContestSubmission {
 		}
 
 		avgFitness_ = getAverageFitness();
+		prevAvgFitness_ = avgFitness_;
+		stDev_ = getStandardDeviation();
 	}
 
 	private List<Candidate> selectParents() {
@@ -147,54 +153,31 @@ public class player20 implements ContestSubmission {
 		double[] child2 = new double[dimensions_];
 		double[] parent1 = parents.get(0).getParameters();
 		double[] parent2 = parents.get(1).getParameters();
-		double[] parent3 = parents.get(2).getParameters();
 		// (((OldValue - OldMin) * NewRange) / OldRange) + NewMin
 		// double dynMut = ((double) evals_) / evaluations_limit_;
 		// double convDynMut = 0.1 + (0.8 * dynMut);
-		double alpha = 1.0 / numParents_;
+		double alpha = 0.6;
 
-		// Recombination
-		// multi-parent crossover
-		// for (int index = 0; index < dimensions_; index++) {
-		// if (rnd_.nextDouble() < (1.0 / 3.0)) {
-		// child1[index] = parent1[index];
-		// if (rnd_.nextDouble() < 0.5) {
-		// child2[index] = parent2[index];
-		// } else {
-		// child2[index] = parent3[index];
-		// }
-		// } else if (rnd_.nextDouble() < (2.0 / 3.0)) {
-		// child1[index] = parent2[index];
-		// if (rnd_.nextDouble() < 0.5) {
-		// child2[index] = parent1[index];
-		// } else {
-		// child2[index] = parent3[index];
-		// }
-		// } else {
-		// child1[index] = parent3[index];
-		// if (rnd_.nextDouble() < 0.5) {
-		// child2[index] = parent1[index];
-		// } else {
-		// child2[index] = parent2[index];
-		// }
-		// }
-		// }
-
-		// multi-parent arithmetic recombination
+		// Arithmetic recombination
 		for (int index = 0; index < dimensions_; index++) {
-			child1[index] = alpha * parent1[index] + alpha * parent2[index]
-					+ alpha * parent3[index];
-			child2[index] = alpha * parent1[index] + alpha * parent2[index]
-					+ alpha * parent3[index];
+			child1[index] = alpha * parent1[index] + (1 - alpha)
+					* parent2[index];
+			child2[index] = alpha * parent2[index] + (1 - alpha)
+					* parent1[index];
 		}
 
 		// mutation
-		for (int index = 0; index < dimensions_; index++) {
-			if (rnd_.nextDouble() < 0.1) {
-				child1[index] = -5 + (10 * rnd_.nextDouble());
-			}
-			if (rnd_.nextDouble() < 0.1) {
-				child2[index] = -5 + (10 * rnd_.nextDouble());
+		if (singleMut_) {
+			child1[rnd_.nextInt(dimensions_)] = -5 + (10 * rnd_.nextDouble());
+			child2[rnd_.nextInt(dimensions_)] = -5 + (10 * rnd_.nextDouble());
+		} else {
+			for (int index = 0; index < dimensions_; index++) {
+				if (rnd_.nextDouble() < 0.1) {
+					child1[index] = -5 + (10 * rnd_.nextDouble());
+				}
+				if (rnd_.nextDouble() < 0.1) {
+					child2[index] = -5 + (10 * rnd_.nextDouble());
+				}
 			}
 		}
 
@@ -221,11 +204,20 @@ public class player20 implements ContestSubmission {
 	}
 
 	private void evaluatePopulation() {
+		prevAvgFitness_ = avgFitness_;
 		avgFitness_ = getAverageFitness();
+		stDev_ = getStandardDeviation();
+
+		// if the population has not improved
+		if (avgFitness_ == prevAvgFitness_) {
+			singleMut_ = true;
+		} else {
+			singleMut_ = false;
+		}
 
 		if (generation_ % 100 == 0) {
-//			System.out.println("Average fitness of generation " + generation_
-//					+ " is: " + avgFitness_);
+			System.out.println("Average fitness of generation " + generation_
+					+ " is: " + avgFitness_);
 		}
 		generation_++;
 	}
