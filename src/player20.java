@@ -21,6 +21,8 @@ public class player20 implements ContestSubmission {
 	private double stDev_;
 	private double prevAvgFitness_;
 	private double avgFitness_;
+	private double prevBestFitness_;
+	private double bestFitness_;
 	private boolean singleMut_;
 	private List<Candidate> population_;
 	private List<Double> probs_;
@@ -28,6 +30,7 @@ public class player20 implements ContestSubmission {
 	private boolean isMultimodal_;
 	private boolean hasStructure_;
 	private boolean isSeparable_;
+	private boolean improv_;
 
 	public player20() {
 		rnd_ = new Random();
@@ -42,6 +45,8 @@ public class player20 implements ContestSubmission {
 		// stDev_; is set in initializePopulation
 		// prevAvgFitness_; is set in initializePopulation
 		// avgFitness_; is set in initializePopulation
+		// prevBestFitness_; is set in initializePopulation
+		// bestFitness_; is set in initializePopulation
 		singleMut_ = false;
 		population_ = new ArrayList<Candidate>();
 		probs_ = new ArrayList<Double>();
@@ -49,6 +54,7 @@ public class player20 implements ContestSubmission {
 		// isMultimodal_; is set in setEvaluation
 		// hasStructure_; is set in setEvaluation
 		// isSeparable_; is set in setEvaluation
+		improv_ = false;
 	}
 
 	public static void main(String[] args) {
@@ -79,8 +85,13 @@ public class player20 implements ContestSubmission {
 		// Change settings(?)
 		if (isMultimodal_) {
 			population_size_ = 100;
+			numParents_ = 100;
+			// delete oldest during survivor selection
+			// use SUS parent selection
 		} else {
-			population_size_ = numParents_ * 2;
+			population_size_ = 10;
+			numParents_ = 4;
+			// use SUS parent selection if generational
 		}
 		if (hasStructure_) {
 		}
@@ -92,8 +103,12 @@ public class player20 implements ContestSubmission {
 	private void initializePopulation() {
 		double mu = population_size_;
 		double p = 0.0;
-		double s = 1.5;
+		double s = 2.0;
 		double pcumul = 0.0;
+
+		if (isMultimodal_) {
+			s = 1.5;
+		}
 
 		// Initialize population and selection probability distribution
 		for (int index = 0; index < population_size_; index++) {
@@ -110,6 +125,8 @@ public class player20 implements ContestSubmission {
 
 		avgFitness_ = getAverageFitness();
 		prevAvgFitness_ = avgFitness_;
+		bestFitness_ = getBestFitness();
+		prevBestFitness_ = bestFitness_;
 		stDev_ = getStandardDeviation();
 	}
 
@@ -122,73 +139,154 @@ public class player20 implements ContestSubmission {
 		// sort population by fitness
 		Collections.sort(population_);
 
-		// Using roulette wheel selection
-		// while (index < numParents/* population_size_ */) {
-		// r = rnd_.nextDouble();
-		// inner = 0;
-		// while (rwprobs_.get(inner) < r) {
-		// inner++;
-		// }
-		// parents.add(population_.get(inner));
-		// index++;
-		// }
-
-		// Using stochastic universal sampling
-		r = (1.0 / population_size_) * rnd_.nextDouble();
-		while (index < numParents_) {
-			while (r <= rwprobs_.get(inner)) {
-				parents.add(population_.get(inner));
-				r += (1.0 / population_size_);
-				index++;
+		if (isMultimodal_ || numParents_ == population_size_) {
+			// Using stochastic universal sampling
+			r = (1.0 / population_size_) * rnd_.nextDouble();
+			while (index < numParents_) {
+				while (r <= rwprobs_.get(inner)) {
+					parents.add(population_.get(inner));
+					r += (1.0 / population_size_);
+					index++;
+				}
+				inner++;
 			}
-			inner++;
+		} else {
+			for (int index2 = 1; index2 <= numParents_; index2++) {
+				parents.add(population_.get(population_size_ - index2));
+			}
 		}
 
 		return parents;
 	}
 
+	// (((OldValue - OldMin) * NewRange) / OldRange) + NewMin
 	private List<Candidate> createChildren(List<Candidate> parents) {
+		List<double[]> childParams = new ArrayList<double[]>();
+		List<double[]> parentParams = new ArrayList<double[]>();
 		List<Candidate> children = new ArrayList<Candidate>();
-		double[] child1 = new double[dimensions_];
-		double[] child2 = new double[dimensions_];
-		double[] parent1 = parents.get(0).getParameters();
-		double[] parent2 = parents.get(1).getParameters();
-		// (((OldValue - OldMin) * NewRange) / OldRange) + NewMin
-		// double dynMut = ((double) evals_) / evaluations_limit_;
-		// double convDynMut = 0.1 + (0.8 * dynMut);
-		double alpha = 0.6;
+		int mutGene = 0;
+		double dynMut = 0;
+		double mutRange = 1;
+		double alpha = 0.5;
+		boolean duplicate = false;
+		int dupCount = 0;
 
-		// Arithmetic recombination
-		for (int index = 0; index < dimensions_; index++) {
-			child1[index] = alpha * parent1[index] + (1 - alpha)
-					* parent2[index];
-			child2[index] = alpha * parent2[index] + (1 - alpha)
-					* parent1[index];
+		// dynMut = ((double) evals_) / evaluations_limit_;
+		//
+		// if (isMultimodal_) {
+		// dynMut = 1 - dynMut; // start with high mutation for diversity
+		// }
+		//
+		// dynMut = dynMut < 0.1 ? 0.1 : dynMut;
+		// dynMut *= mutRange * (rnd_.nextInt(1) == 0 ? -1 : 1);
+
+		// if (bestFitness_ == prevBestFitness_) {
+		// dynMut = 5;
+		// } else {
+		// dynMut = 0.1;
+		// }
+		// dynMut = dynMut * rnd_.nextDouble() * (rnd_.nextInt(1) == 0 ? -1 :
+		// 1);
+
+		for (int index = 0; index < numParents_; index++) {
+			parentParams.add(parents.get(index).getParameters());
 		}
 
-		// mutation
-		if (singleMut_) {
-			child1[rnd_.nextInt(dimensions_)] = -5 + (10 * rnd_.nextDouble());
-			child2[rnd_.nextInt(dimensions_)] = -5 + (10 * rnd_.nextDouble());
-		} else {
-			for (int index = 0; index < dimensions_; index++) {
-				if (rnd_.nextDouble() < 0.1) {
-					child1[index] = -5 + (10 * rnd_.nextDouble());
+		mating: while (children.size() < numParents_) {
+
+			for (int index = 0; index < numParents_; index++) {
+				childParams.add(new double[dimensions_]);
+			}
+
+			// recombination
+			for (int gene = 0; gene < dimensions_; gene++) {
+				for (int candidate = 0; candidate < numParents_; candidate += 2) {
+					if (rnd_.nextDouble() < 0.5) {
+						// Arithmetic recombination per gene
+						childParams.get(candidate)[gene] = alpha
+								* parentParams.get(candidate)[gene]
+								+ (1 - alpha)
+								* parentParams.get(candidate + 1)[gene];
+						childParams.get(candidate + 1)[gene] = alpha
+								* parentParams.get(candidate + 1)[gene]
+								+ (1 - alpha)
+								* parentParams.get(candidate)[gene];
+					} else {
+						// Crossover per gene
+						if (rnd_.nextDouble() < 0.5) {
+							childParams.get(candidate)[gene] = parentParams
+									.get(candidate)[gene];
+							childParams.get(candidate + 1)[gene] = parentParams
+									.get(candidate + 1)[gene];
+						} else {
+							childParams.get(candidate)[gene] = parentParams
+									.get(candidate + 1)[gene];
+							childParams.get(candidate + 1)[gene] = parentParams
+									.get(candidate)[gene];
+						}
+					}
 				}
-				if (rnd_.nextDouble() < 0.1) {
-					child2[index] = -5 + (10 * rnd_.nextDouble());
+			}
+
+			// mutation
+			for (int candidate = 0; candidate < numParents_; candidate++) {
+				if (singleMut_) {
+					mutGene = rnd_.nextInt(dimensions_);
+					childParams.get(candidate)[mutGene] = -5
+							+ (10 * rnd_.nextDouble());
+					// childParams.get(candidate)[mutGene] += dynMut;
+					// childParams.get(candidate)[mutGene] = childParams
+					// .get(candidate)[mutGene] < -5 ? -5 : childParams
+					// .get(candidate)[mutGene] > 5 ? 5 : childParams
+					// .get(candidate)[mutGene];
+				} else {
+					for (int gene = 0; gene < dimensions_; gene++) {
+						if (rnd_.nextDouble() < 0.1) {
+							childParams.get(candidate)[gene] = -5
+									+ (10 * rnd_.nextDouble());
+							// childParams.get(candidate)[mutGene] += dynMut;
+							// childParams.get(candidate)[mutGene] = childParams
+							// .get(candidate)[mutGene] < -5 ? -5
+							// : childParams.get(candidate)[mutGene] > 5 ? 5
+							// : childParams.get(candidate)[mutGene];
+						}
+					}
+				}
+			}
+
+			// check for duplicates in the population
+			for (double[] child : childParams) {
+				duplicate = false;
+				for (Candidate c : population_) {
+					dupCount = 0;
+					for (int gene = 0; gene < dimensions_; gene++) {
+						if (c.getParameters()[gene] == child[gene]) {
+							dupCount++;
+						}
+					}
+					if (dupCount >= dimensions_) {
+						duplicate = true;
+						break;
+					}
+				}
+				if (evals_ >= evaluations_limit_) {
+					break mating;
+				} else if (!duplicate) {
+					children.add(new Candidate(evaluation_, generation_, this,
+							child));
 				}
 			}
 		}
-
-		children.add(new Candidate(evaluation_, generation_, this, child1));
-		children.add(new Candidate(evaluation_, generation_, this, child2));
 
 		return children;
 	}
 
 	private void selectSurvivors(List<Candidate> children,
 			List<Candidate> parents) {
+		Candidate oldestC = null;
+		int oldest = Integer.MAX_VALUE;
+		int numOldRemoved = 2;
+
 		// Add children to the population
 		for (Candidate c : children) {
 			population_.add(c);
@@ -197,27 +295,50 @@ public class player20 implements ContestSubmission {
 		// Sort population by fitness
 		Collections.sort(population_);
 
-		// Remove the two(!) candidates with the lowest fitness
+		// delete the two (numOldRemoved) oldest
+		if (isMultimodal_ && generation_ % 10 == 0) {
+			for (int old = 0; old < numOldRemoved
+					&& population_.size() > population_size_; old++) {
+				oldest = Integer.MAX_VALUE;
+				for (Candidate c : population_) {
+					if (c.getGeneration() <= oldest) {
+						oldest = c.getGeneration();
+						oldestC = c;
+					}
+				}
+				population_.remove(oldestC);
+			}
+		}
+
+		// Remove the candidates with the lowest fitness
 		while (population_.size() > population_size_) {
 			population_.remove(0);
 		}
 	}
 
 	private void evaluatePopulation() {
+		stDev_ = getStandardDeviation();
 		prevAvgFitness_ = avgFitness_;
 		avgFitness_ = getAverageFitness();
-		stDev_ = getStandardDeviation();
 
-		// if the population has not improved
 		if (avgFitness_ == prevAvgFitness_) {
 			singleMut_ = true;
 		} else {
 			singleMut_ = false;
 		}
 
-		if (generation_ % 100 == 0) {
-			System.out.println("Average fitness of generation " + generation_
-					+ " is: " + avgFitness_);
+		if (generation_ % 10 == 0) {
+			prevBestFitness_ = bestFitness_;
+			bestFitness_ = getBestFitness();
+
+			if (bestFitness_ > prevBestFitness_) {
+				improv_ = true;
+			} else {
+				improv_ = false;
+			}
+			System.out.println("Generation: " + generation_ + " Average: "
+					+ avgFitness_ + " Best: " + bestFitness_ + " Improvement? "
+			+ (improv_ ? true : ""));
 		}
 		generation_++;
 	}
@@ -228,6 +349,16 @@ public class player20 implements ContestSubmission {
 			sum += c.getFitness();
 		}
 		return sum / population_.size();
+	}
+
+	private double getBestFitness() {
+		double best = Double.MIN_VALUE;
+		for (Candidate c : population_) {
+			if (c.getFitness() > best) {
+				best = c.getFitness();
+			}
+		}
+		return best;
 	}
 
 	private double getStandardDeviation() {
@@ -246,12 +377,13 @@ public class player20 implements ContestSubmission {
 	}
 
 	public void run() {
+		long start = System.currentTimeMillis();
 		// Run your algorithm here
 
 		// initialize the population
 		initializePopulation();
 
-		while (/* generation_ < 10 */evals_ < evaluations_limit_) {
+		while (evals_ < evaluations_limit_) {
 
 			// parent selection
 			List<Candidate> parents = selectParents();
@@ -266,5 +398,6 @@ public class player20 implements ContestSubmission {
 			evaluatePopulation();
 		}
 		System.out.println("Final result: " + evaluation_.getFinalResult());
+		System.out.println("Duration: " + (System.currentTimeMillis() - start) + "ms");
 	}
 }
