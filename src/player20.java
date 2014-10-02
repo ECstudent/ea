@@ -18,7 +18,8 @@ public class player20 implements ContestSubmission {
 	private int generation_;
 	private int evaluations_limit_;
 	private int population_size_;
-	private double stDev_;
+	private double[] stDevs_;
+	private double[] avgParams_;
 	private double prevAvgFitness_;
 	private double avgFitness_;
 	private double prevBestFitness_;
@@ -42,7 +43,8 @@ public class player20 implements ContestSubmission {
 		generation_ = 1;
 		// evaluations_limit_; is set in setEvaluation
 		// population_size_; is set in setEvaluation
-		// stDev_; is set in initializePopulation
+		// stDevs_; is set in initializePopulation
+		// avgParams_; is set in initializePopulation
 		// prevAvgFitness_; is set in initializePopulation
 		// avgFitness_; is set in initializePopulation
 		// prevBestFitness_; is set in initializePopulation
@@ -127,7 +129,7 @@ public class player20 implements ContestSubmission {
 		prevAvgFitness_ = avgFitness_;
 		bestFitness_ = getBestFitness();
 		prevBestFitness_ = bestFitness_;
-		stDev_ = getStandardDeviation();
+		setParamDistro();
 	}
 
 	private List<Candidate> selectParents() {
@@ -164,13 +166,18 @@ public class player20 implements ContestSubmission {
 		List<double[]> childParams = new ArrayList<double[]>();
 		List<double[]> parentParams = new ArrayList<double[]>();
 		List<Candidate> children = new ArrayList<Candidate>();
-		int mutGene = 0;
-		int accuracy = 1000000000;
-		double dynMut = 0;
-		double mutRange = 1;
+		double[][] dynMut = new double[dimensions_][2];
+		double mutChange = 0.0;
 		double alpha = 0.5;
-		boolean duplicate = false;
+		int mutGene = 0;
 		int dupCount = 0;
+		int accuracy = 1000000000;
+		boolean duplicate = false;
+
+		for (int index = 0; index < dimensions_; index++) {
+			dynMut[index][0] = stDevs_[index];
+			dynMut[index][1] = avgParams_[index];
+		}
 
 		// dynMut = ((double) evals_) / evaluations_limit_;
 		//
@@ -219,11 +226,11 @@ public class player20 implements ContestSubmission {
 					mutGene = rnd_.nextInt(dimensions_);
 					childParams.get(candidate)[mutGene] = -5
 							+ (10 * rnd_.nextDouble());
-					// childParams.get(candidate)[mutGene] += dynMut;
-					// childParams.get(candidate)[mutGene] = childParams
-					// .get(candidate)[mutGene] < -5 ? -5 : childParams
-					// .get(candidate)[mutGene] > 5 ? 5 : childParams
-					// .get(candidate)[mutGene];
+					// mutChange = avgParams_[mutGene]
+					// + (stDevs_[mutGene] * rnd_.nextGaussian());
+					// mutChange = mutChange < -5 ? -5 : mutChange > 5 ? 5
+					// : mutChange;
+					// childParams.get(candidate)[mutGene] = mutChange;
 				} else {
 					for (int gene = 0; gene < dimensions_; gene++) {
 						if (rnd_.nextDouble() < 0.1) {
@@ -302,7 +309,7 @@ public class player20 implements ContestSubmission {
 	}
 
 	private void evaluatePopulation() {
-		stDev_ = getStandardDeviation();
+		setParamDistro();
 		prevAvgFitness_ = avgFitness_;
 		avgFitness_ = getAverageFitness();
 
@@ -346,19 +353,30 @@ public class player20 implements ContestSubmission {
 		return best;
 	}
 
-	private double getStandardDeviation() {
-		return Math.sqrt(getVariance());
-	}
-
-	private double getVariance() {
+	private void setParamDistro() {
 		double sum = 0.0;
-		double sqdiff = 0.0;
-		for (Candidate c : population_) {
-			sqdiff = Math.abs(c.getFitness() - avgFitness_);
-			sqdiff *= sqdiff;
-			sum += sqdiff;
+		double diff = 0.0;
+
+		stDevs_ = new double[dimensions_];
+		avgParams_ = new double[dimensions_];
+
+		for (int index = 0; index < dimensions_; index++) {
+			sum = 0.0;
+			for (Candidate c : population_) {
+				sum += c.getParameters()[index];
+			}
+			avgParams_[index] = sum / population_size_;
 		}
-		return sum / population_.size();
+
+		for (int index = 0; index < dimensions_; index++) {
+			sum = 0.0;
+			for (Candidate c : population_) {
+				diff = Math.abs(c.getParameters()[index] - avgParams_[index]);
+				diff *= diff;
+				sum += diff;
+			}
+			stDevs_[index] = Math.sqrt(sum / population_size_);
+		}
 	}
 
 	public void run() {
