@@ -24,6 +24,7 @@ public class player20 implements ContestSubmission {
 	private double avgFitness_;
 	private double prevBestFitness_;
 	private double bestFitness_;
+	private double mutRate_;
 	private boolean singleMut_;
 	private List<Candidate> population_;
 	private List<Double> probs_;
@@ -49,6 +50,7 @@ public class player20 implements ContestSubmission {
 		// avgFitness_; is set in initializePopulation
 		// prevBestFitness_; is set in initializePopulation
 		// bestFitness_; is set in initializePopulation
+		// mutRate_; is set in setEvaluation
 		singleMut_ = false;
 		population_ = new ArrayList<Candidate>();
 		probs_ = new ArrayList<Double>();
@@ -87,13 +89,14 @@ public class player20 implements ContestSubmission {
 		// Change settings(?)
 		if (isMultimodal_) {
 			population_size_ = 100;
-			numParents_ = 100;
+			numParents_ = 10;
+			mutRate_ = 0.3;
 			// delete oldest during survivor selection
 			// use SUS parent selection
 		} else {
 			population_size_ = 4;
 			numParents_ = 2;
-			// use SUS parent selection if generational
+			mutRate_ = 0.1;
 		}
 		if (hasStructure_) {
 		}
@@ -141,7 +144,7 @@ public class player20 implements ContestSubmission {
 		// sort population by fitness
 		Collections.sort(population_);
 
-		if (isMultimodal_ || numParents_ == population_size_) {
+		if (isMultimodal_) {
 			// Using stochastic universal sampling
 			r = (1.0 / population_size_) * rnd_.nextDouble();
 			while (index < numParents_) {
@@ -166,35 +169,12 @@ public class player20 implements ContestSubmission {
 		List<double[]> childParams = new ArrayList<double[]>();
 		List<double[]> parentParams = new ArrayList<double[]>();
 		List<Candidate> children = new ArrayList<Candidate>();
-		double[][] dynMut = new double[dimensions_][2];
 		double mutChange = 0.0;
-		double alpha = 0.5;
+		double alpha = 0.75;
 		int mutGene = 0;
 		int dupCount = 0;
-		int accuracy = 1000000000;
+		long accuracy = 1000000000000000L;
 		boolean duplicate = false;
-
-		for (int index = 0; index < dimensions_; index++) {
-			dynMut[index][0] = stDevs_[index];
-			dynMut[index][1] = avgParams_[index];
-		}
-
-		// dynMut = ((double) evals_) / evaluations_limit_;
-		//
-		// if (isMultimodal_) {
-		// dynMut = 1 - dynMut; // start with high mutation for diversity
-		// }
-		//
-		// dynMut = dynMut < 0.1 ? 0.1 : dynMut;
-		// dynMut *= mutRange * (rnd_.nextInt(1) == 0 ? -1 : 1);
-
-		// if (bestFitness_ == prevBestFitness_) {
-		// dynMut = 5;
-		// } else {
-		// dynMut = 0.1;
-		// }
-		// dynMut = dynMut * rnd_.nextDouble() * (rnd_.nextInt(1) == 0 ? -1 :
-		// 1);
 
 		for (int index = 0; index < numParents_; index++) {
 			parentParams.add(parents.get(index).getParameters());
@@ -224,23 +204,29 @@ public class player20 implements ContestSubmission {
 			for (int candidate = 0; candidate < numParents_; candidate++) {
 				if (singleMut_) {
 					mutGene = rnd_.nextInt(dimensions_);
-					childParams.get(candidate)[mutGene] = -5
-							+ (10 * rnd_.nextDouble());
-					// mutChange = avgParams_[mutGene]
-					// + (stDevs_[mutGene] * rnd_.nextGaussian());
-					// mutChange = mutChange < -5 ? -5 : mutChange > 5 ? 5
-					// : mutChange;
-					// childParams.get(candidate)[mutGene] = mutChange;
+					if (hasStructure_) {
+						childParams.get(candidate)[mutGene] = -5
+								+ (10 * rnd_.nextDouble());
+					} else {
+						mutChange = avgParams_[mutGene]
+								+ (stDevs_[mutGene] * rnd_.nextGaussian());
+						mutChange = mutChange < -5 ? -5 : mutChange > 5 ? 5
+								: mutChange;
+						childParams.get(candidate)[mutGene] = mutChange;
+					}
 				} else {
 					for (int gene = 0; gene < dimensions_; gene++) {
-						if (rnd_.nextDouble() < 0.1) {
+						if (rnd_.nextDouble() < mutRate_) {
+							// if (hasStructure_) {
 							childParams.get(candidate)[gene] = -5
 									+ (10 * rnd_.nextDouble());
-							// childParams.get(candidate)[mutGene] += dynMut;
-							// childParams.get(candidate)[mutGene] = childParams
-							// .get(candidate)[mutGene] < -5 ? -5
-							// : childParams.get(candidate)[mutGene] > 5 ? 5
-							// : childParams.get(candidate)[mutGene];
+							// } else {
+							// mutChange = avgParams_[gene]
+							// + (stDevs_[gene] * rnd_.nextGaussian());
+							// mutChange = mutChange < -5 ? -5
+							// : mutChange > 5 ? 5 : mutChange;
+							// childParams.get(candidate)[gene] = mutChange;
+							// }
 						}
 					}
 				}
@@ -252,7 +238,7 @@ public class player20 implements ContestSubmission {
 				for (Candidate c : population_) {
 					dupCount = 0;
 					for (int gene = 0; gene < dimensions_; gene++) {
-						if ((int) (c.getParameters()[gene] * accuracy) == (int) (child[gene] * accuracy)) {
+						if ((long) (c.getParameters()[gene] * accuracy) == (long) (child[gene] * accuracy)) {
 							dupCount++;
 						}
 					}
@@ -278,6 +264,7 @@ public class player20 implements ContestSubmission {
 		Candidate oldestC = null;
 		int oldest = Integer.MAX_VALUE;
 		int numOldRemoved = 2;
+		int exception = 1;
 
 		// Add children to the population
 		for (Candidate c : children) {
@@ -302,9 +289,14 @@ public class player20 implements ContestSubmission {
 			}
 		}
 
-		// Remove the candidates with the lowest fitness
+		if (isMultimodal_) {
+			exception = 2;
+		}
+
+		// Randomly remove candidates (best candidate excluded)
+		// Works better than elitism!!!
 		while (population_.size() > population_size_) {
-			population_.remove(0);
+			population_.remove(rnd_.nextInt(population_.size() - exception));
 		}
 	}
 
@@ -319,7 +311,7 @@ public class player20 implements ContestSubmission {
 			singleMut_ = false;
 		}
 
-		if (generation_ % 100 == 0) {
+		if (generation_ % 10 == 0) {
 			prevBestFitness_ = bestFitness_;
 			bestFitness_ = getBestFitness();
 
@@ -366,9 +358,7 @@ public class player20 implements ContestSubmission {
 				sum += c.getParameters()[index];
 			}
 			avgParams_[index] = sum / population_size_;
-		}
 
-		for (int index = 0; index < dimensions_; index++) {
 			sum = 0.0;
 			for (Candidate c : population_) {
 				diff = Math.abs(c.getParameters()[index] - avgParams_[index]);
