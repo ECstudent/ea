@@ -6,6 +6,7 @@ public class Candidate implements Comparable<Candidate> {
 
 	private ContestEvaluation evaluation_;
 	private double[] parameters_;
+	private double[] stDevs_;
 	private Random rnd_;
 	private Double fitness_;
 	private int generation_;
@@ -23,11 +24,13 @@ public class Candidate implements Comparable<Candidate> {
 		evaluation_ = evaluation;
 		generation_ = generation;
 		parameters_ = new double[dimensions_];
+		stDevs_ = new double[dimensions_];
 		rnd_ = new Random();
 		rnd_.setSeed(System.nanoTime());
 		for (int index = 0; index < dimensions_; index++) {
 			parameters_[index] = rangeMin_
 					+ ((rangeMax_ - rangeMin_) * rnd_.nextDouble());
+			stDevs_[index] = 1;
 		}
 		fitness_ = (Double) evaluation_.evaluate(parameters_);
 		p.evals_++;
@@ -41,16 +44,21 @@ public class Candidate implements Comparable<Candidate> {
 	 * @param parameters
 	 */
 	public Candidate(ContestEvaluation evaluation, int generation, player20 p,
-			double[] parameters) {
+			double[] parameters, double[] stDevs) {
 		evaluation_ = evaluation;
 		generation_ = generation;
 		parameters_ = parameters;
+		stDevs_ = stDevs;
 		fitness_ = (Double) evaluation_.evaluate(parameters_);
 		p.evals_++;
 	}
 
 	public double[] getParameters() {
 		return parameters_;
+	}
+	
+	public double[] getStandardDevs() {
+		return stDevs_;
 	}
 
 	public int getGeneration() {

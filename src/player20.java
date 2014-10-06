@@ -18,8 +18,6 @@ public class player20 implements ContestSubmission {
 	private int generation_;
 	private int evaluations_limit_;
 	private int population_size_;
-	private double[] stDevs_;
-	private double[] avgParams_;
 	private double prevAvgFitness_;
 	private double avgFitness_;
 	private double prevBestFitness_;
@@ -94,7 +92,7 @@ public class player20 implements ContestSubmission {
 			// delete oldest during survivor selection
 			// use SUS parent selection
 		} else {
-			population_size_ = 4;
+			population_size_ = 8;
 			numParents_ = 2;
 			mutRate_ = 0.1;
 		}
@@ -132,14 +130,13 @@ public class player20 implements ContestSubmission {
 		prevAvgFitness_ = avgFitness_;
 		bestFitness_ = getBestFitness();
 		prevBestFitness_ = bestFitness_;
-		setParamDistro();
 	}
 
 	private List<Candidate> selectParents() {
+		List<Candidate> parents = new ArrayList<Candidate>();
 		int index = 0;
 		int inner = 0;
 		double r = 0.0;
-		List<Candidate> parents = new ArrayList<Candidate>();
 
 		// sort population by fitness
 		Collections.sort(population_);
@@ -156,6 +153,7 @@ public class player20 implements ContestSubmission {
 				inner++;
 			}
 		} else {
+			// Retrieve the best candidates
 			for (int index2 = 1; index2 <= numParents_; index2++) {
 				parents.add(population_.get(population_size_ - index2));
 			}
@@ -164,27 +162,31 @@ public class player20 implements ContestSubmission {
 		return parents;
 	}
 
-	// (((OldValue - OldMin) * NewRange) / OldRange) + NewMin
 	private List<Candidate> createChildren(List<Candidate> parents) {
+		List<double[]> childStDevs = new ArrayList<double[]>();
 		List<double[]> childParams = new ArrayList<double[]>();
+		List<double[]> parentStDevs = new ArrayList<double[]>();
 		List<double[]> parentParams = new ArrayList<double[]>();
 		List<Candidate> children = new ArrayList<Candidate>();
-		double mutChange = 0.0;
+		double minStDev = 0.1;
 		double alpha = 0.75;
+		double learningRate1 = 1 / Math.sqrt(2 * dimensions_);
+		double learningRate2 = 1 / Math.sqrt(2 * Math.sqrt(dimensions_));
 		int mutGene = 0;
-		int dupCount = 0;
 		long accuracy = 1000000000000000L;
 		boolean duplicate = false;
 
 		for (int index = 0; index < numParents_; index++) {
 			parentParams.add(parents.get(index).getParameters());
+			parentStDevs.add(parents.get(index).getStandardDevs());
 		}
 
 		mating: while (children.size() < numParents_) {
-
 			childParams = new ArrayList<double[]>();
+			childStDevs = new ArrayList<double[]>();
 			for (int index = 0; index < numParents_; index++) {
 				childParams.add(new double[dimensions_]);
+				childStDevs.add(new double[dimensions_]);
 			}
 
 			// recombination
@@ -197,35 +199,54 @@ public class player20 implements ContestSubmission {
 					childParams.get(candidate + 1)[gene] = alpha
 							* parentParams.get(candidate + 1)[gene]
 							+ (1 - alpha) * parentParams.get(candidate)[gene];
+					childStDevs.get(candidate)[gene] = alpha
+							* parentStDevs.get(candidate)[gene] + (1 - alpha)
+							* parentStDevs.get(candidate + 1)[gene];
+					childStDevs.get(candidate + 1)[gene] = alpha
+							* parentStDevs.get(candidate + 1)[gene]
+							+ (1 - alpha) * parentStDevs.get(candidate)[gene];
 				}
 			}
 
 			// mutation
-			for (int candidate = 0; candidate < numParents_; candidate++) {
+			for (int child = 0; child < numParents_; child++) {
 				if (singleMut_) {
 					mutGene = rnd_.nextInt(dimensions_);
-					if (hasStructure_) {
-						childParams.get(candidate)[mutGene] = -5
-								+ (10 * rnd_.nextDouble());
-					} else {
-						mutChange = avgParams_[mutGene]
-								+ (stDevs_[mutGene] * rnd_.nextGaussian());
-						mutChange = mutChange < -5 ? -5 : mutChange > 5 ? 5
-								: mutChange;
-						childParams.get(candidate)[mutGene] = mutChange;
-					}
+					// if (hasStructure_) {
+					childStDevs.get(child)[mutGene] *= Math.exp(learningRate1
+							* rnd_.nextGaussian() + learningRate2
+							* rnd_.nextGaussian());
+					childStDevs.get(child)[mutGene] = childStDevs.get(child)[mutGene] < minStDev ? minStDev
+							: childStDevs.get(child)[mutGene];
+					childParams.get(child)[mutGene] += childStDevs.get(child)[mutGene]
+							* rnd_.nextGaussian();
+					childParams.get(child)[mutGene] = childParams.get(child)[mutGene] < -5 ? -5
+							: childParams.get(child)[mutGene] > 5 ? 5
+									: childParams.get(child)[mutGene];
+					// childParams.get(child)[mutGene] = -5
+					// + (10 * rnd_.nextDouble());
+					// } else {
+					// }
 				} else {
 					for (int gene = 0; gene < dimensions_; gene++) {
 						if (rnd_.nextDouble() < mutRate_) {
 							// if (hasStructure_) {
-							childParams.get(candidate)[gene] = -5
-									+ (10 * rnd_.nextDouble());
+							childStDevs.get(child)[gene] *= Math
+									.exp(learningRate1 * rnd_.nextGaussian()
+											+ learningRate2
+											* rnd_.nextGaussian());
+							childStDevs.get(child)[gene] = childStDevs
+									.get(child)[gene] < minStDev ? minStDev
+									: childStDevs.get(child)[gene];
+							childParams.get(child)[gene] += childStDevs
+									.get(child)[gene] * rnd_.nextGaussian();
+							childParams.get(child)[gene] = childParams
+									.get(child)[gene] < -5 ? -5 : childParams
+									.get(child)[gene] > 5 ? 5 : childParams
+									.get(child)[gene];
+							// childParams.get(child)[gene] = -5
+							// + (10 * rnd_.nextDouble());
 							// } else {
-							// mutChange = avgParams_[gene]
-							// + (stDevs_[gene] * rnd_.nextGaussian());
-							// mutChange = mutChange < -5 ? -5
-							// : mutChange > 5 ? 5 : mutChange;
-							// childParams.get(candidate)[gene] = mutChange;
 							// }
 						}
 					}
@@ -233,25 +254,23 @@ public class player20 implements ContestSubmission {
 			}
 
 			// check for duplicates in the population
-			for (double[] child : childParams) {
+			for (int child = 0; child < numParents_; child++) {
 				duplicate = false;
-				for (Candidate c : population_) {
-					dupCount = 0;
+				popsearch: for (Candidate c : population_) {
 					for (int gene = 0; gene < dimensions_; gene++) {
-						if ((long) (c.getParameters()[gene] * accuracy) == (long) (child[gene] * accuracy)) {
-							dupCount++;
+						if ((long) (c.getParameters()[gene] * accuracy) != (long) (childParams
+								.get(child)[gene] * accuracy)) {
+							continue popsearch;
 						}
 					}
-					if (dupCount >= dimensions_) {
-						duplicate = true;
-						break;
-					}
+					duplicate = true;
+					break;
 				}
 				if (evals_ >= evaluations_limit_) {
 					break mating;
 				} else if (!duplicate) {
 					children.add(new Candidate(evaluation_, generation_, this,
-							child));
+							childParams.get(child), childStDevs.get(child)));
 				}
 			}
 		}
@@ -263,7 +282,7 @@ public class player20 implements ContestSubmission {
 			List<Candidate> parents) {
 		Candidate oldestC = null;
 		int oldest = Integer.MAX_VALUE;
-		int numOldRemoved = 2;
+		// int numOldRemoved = 1;
 		int exception = 1;
 
 		// Add children to the population
@@ -274,10 +293,8 @@ public class player20 implements ContestSubmission {
 		// Sort population by fitness
 		Collections.sort(population_);
 
-		// delete the two (numOldRemoved) oldest
-		if (isMultimodal_ && generation_ % 10 == 0) {
-			for (int old = 0; old < numOldRemoved
-					&& population_.size() > population_size_; old++) {
+		if (isMultimodal_) {
+			while (population_.size() > population_size_) {
 				oldest = Integer.MAX_VALUE;
 				for (Candidate c : population_) {
 					if (c.getGeneration() <= oldest) {
@@ -287,21 +304,35 @@ public class player20 implements ContestSubmission {
 				}
 				population_.remove(oldestC);
 			}
+		} else {
+			while (population_.size() > population_size_) {
+				population_
+						.remove(rnd_.nextInt(population_.size() - exception));
+			}
 		}
 
-		if (isMultimodal_) {
-			exception = 2;
-		}
-
-		// Randomly remove candidates (best candidate excluded)
-		// Works better than elitism!!!
-		while (population_.size() > population_size_) {
-			population_.remove(rnd_.nextInt(population_.size() - exception));
-		}
+		// // delete the numOldRemoved oldest
+		// if (isMultimodal_ && generation_ % 10 == 0) {
+		// for (int old = 0; old < numOldRemoved
+		// && population_.size() > population_size_; old++) {
+		// oldest = Integer.MAX_VALUE;
+		// for (Candidate c : population_) {
+		// if (c.getGeneration() <= oldest) {
+		// oldest = c.getGeneration();
+		// oldestC = c;
+		// }
+		// }
+		// population_.remove(oldestC);
+		// }
+		// }
+		//
+		// // Randomly remove candidates (best candidate excluded)
+		// while (population_.size() > population_size_) {
+		// population_.remove(rnd_.nextInt(population_.size() - exception));
+		// }
 	}
 
 	private void evaluatePopulation() {
-		setParamDistro();
 		prevAvgFitness_ = avgFitness_;
 		avgFitness_ = getAverageFitness();
 
@@ -343,30 +374,6 @@ public class player20 implements ContestSubmission {
 			}
 		}
 		return best;
-	}
-
-	private void setParamDistro() {
-		double sum = 0.0;
-		double diff = 0.0;
-
-		stDevs_ = new double[dimensions_];
-		avgParams_ = new double[dimensions_];
-
-		for (int index = 0; index < dimensions_; index++) {
-			sum = 0.0;
-			for (Candidate c : population_) {
-				sum += c.getParameters()[index];
-			}
-			avgParams_[index] = sum / population_size_;
-
-			sum = 0.0;
-			for (Candidate c : population_) {
-				diff = Math.abs(c.getParameters()[index] - avgParams_[index]);
-				diff *= diff;
-				sum += diff;
-			}
-			stDevs_[index] = Math.sqrt(sum / population_size_);
-		}
 	}
 
 	public void run() {
