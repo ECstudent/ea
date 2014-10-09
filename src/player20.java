@@ -61,10 +61,10 @@ public class player20 implements ContestSubmission {
 
 	public static void main(String[] args) {
 		// Initialize population
-		player20 p = new player20();
-		p.setSeed(System.nanoTime());
-		p.setEvaluation(new SphereEvaluation());
-		p.run();
+		// player20 p = new player20();
+		// p.setSeed(System.nanoTime());
+		// p.setEvaluation(new SphereEvaluation());
+		// p.run();
 	}
 
 	public void setSeed(long seed) {
@@ -168,6 +168,7 @@ public class player20 implements ContestSubmission {
 		List<double[]> parentStDevs = new ArrayList<double[]>();
 		List<double[]> parentParams = new ArrayList<double[]>();
 		List<Candidate> children = new ArrayList<Candidate>();
+		double c2 = 0.9;
 		double minStDev = 0.1;
 		double alpha = 0.75;
 		double learningRate1 = 1 / Math.sqrt(2 * dimensions_);
@@ -218,7 +219,9 @@ public class player20 implements ContestSubmission {
 							* rnd_.nextGaussian());
 					childStDevs.get(child)[mutGene] = childStDevs.get(child)[mutGene] < minStDev ? minStDev
 							: childStDevs.get(child)[mutGene];
-					childParams.get(child)[mutGene] += childStDevs.get(child)[mutGene]
+					childParams.get(child)[mutGene] += (improv_ ? childStDevs
+							.get(child)[mutGene] * c2
+							: childStDevs.get(child)[mutGene] / c2)
 							* rnd_.nextGaussian();
 					childParams.get(child)[mutGene] = childParams.get(child)[mutGene] < -5 ? -5
 							: childParams.get(child)[mutGene] > 5 ? 5
@@ -238,8 +241,10 @@ public class player20 implements ContestSubmission {
 							childStDevs.get(child)[gene] = childStDevs
 									.get(child)[gene] < minStDev ? minStDev
 									: childStDevs.get(child)[gene];
-							childParams.get(child)[gene] += childStDevs
-									.get(child)[gene] * rnd_.nextGaussian();
+							childParams.get(child)[gene] += (improv_ ? childStDevs
+									.get(child)[mutGene] * c2
+									: childStDevs.get(child)[mutGene] / c2)
+									* rnd_.nextGaussian();
 							childParams.get(child)[gene] = childParams
 									.get(child)[gene] < -5 ? -5 : childParams
 									.get(child)[gene] > 5 ? 5 : childParams
@@ -351,9 +356,9 @@ public class player20 implements ContestSubmission {
 			} else {
 				improv_ = false;
 			}
-			System.out.println("Generation: " + generation_ + " Average: "
-					+ avgFitness_ + " Best: " + bestFitness_ + " Improvement? "
-					+ (improv_ ? true : ""));
+			// System.out.println("Generation: " + generation_ + " Average: "
+			// + avgFitness_ + " Best: " + bestFitness_ + " Improvement? "
+			// + (improv_ ? true : ""));
 		}
 		generation_++;
 	}
