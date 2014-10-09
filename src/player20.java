@@ -22,8 +22,8 @@ public class player20 implements ContestSubmission {
 	private double avgFitness_;
 	private double prevBestFitness_;
 	private double bestFitness_;
-	private double mutRate_;
-	private boolean singleMut_;
+	private double mutRateMin_;
+	private double mutRateMax_;
 	private List<Candidate> population_;
 	private List<Double> probs_;
 	private List<Double> rwprobs_;
@@ -48,8 +48,8 @@ public class player20 implements ContestSubmission {
 		// avgFitness_; is set in initializePopulation
 		// prevBestFitness_; is set in initializePopulation
 		// bestFitness_; is set in initializePopulation
-		// mutRate_; is set in setEvaluation
-		singleMut_ = false;
+		// mutRateMin_; is set in setEvaluation
+		// mutRateMax_; is set in setEvaluation
 		population_ = new ArrayList<Candidate>();
 		probs_ = new ArrayList<Double>();
 		rwprobs_ = new ArrayList<Double>();
@@ -61,10 +61,10 @@ public class player20 implements ContestSubmission {
 
 	public static void main(String[] args) {
 		// Initialize population
-		// player20 p = new player20();
-		// p.setSeed(System.nanoTime());
-		// p.setEvaluation(new SphereEvaluation());
-		// p.run();
+		player20 p = new player20();
+		p.setSeed(System.nanoTime());
+		p.setEvaluation(new SphereEvaluation());
+		p.run();
 	}
 
 	public void setSeed(long seed) {
@@ -88,13 +88,15 @@ public class player20 implements ContestSubmission {
 		if (isMultimodal_) {
 			population_size_ = 100;
 			numParents_ = 10;
-			mutRate_ = 0.3;
-			// delete oldest during survivor selection
+			mutRateMin_ = 0.1;
+			mutRateMax_ = 0.5;
+			// delete oldest every 10 generations during survivor selection
 			// use SUS parent selection
 		} else {
 			population_size_ = 8;
 			numParents_ = 2;
-			mutRate_ = 0.1;
+			mutRateMin_ = 0.01;
+			mutRateMax_ = 0.1;
 		}
 		if (hasStructure_) {
 		}
@@ -168,14 +170,21 @@ public class player20 implements ContestSubmission {
 		List<double[]> parentStDevs = new ArrayList<double[]>();
 		List<double[]> parentParams = new ArrayList<double[]>();
 		List<Candidate> children = new ArrayList<Candidate>();
+		double varMutRate = 1.0 - ((double) evals_ / evaluations_limit_);
 		double c2 = 0.9;
 		double minStDev = 0.1;
 		double alpha = 0.75;
 		double learningRate1 = 1 / Math.sqrt(2 * dimensions_);
 		double learningRate2 = 1 / Math.sqrt(2 * Math.sqrt(dimensions_));
-		int mutGene = 0;
 		long accuracy = 1000000000000000L;
 		boolean duplicate = false;
+
+		if (isMultimodal_) {
+			varMutRate = mutRateMin_
+					+ (varMutRate * (mutRateMax_ - mutRateMin_));
+		} else {
+			varMutRate = 0.01;
+		}
 
 		for (int index = 0; index < numParents_; index++) {
 			parentParams.add(parents.get(index).getParameters());
@@ -211,49 +220,25 @@ public class player20 implements ContestSubmission {
 
 			// mutation
 			for (int child = 0; child < numParents_; child++) {
-				if (singleMut_) {
-					mutGene = rnd_.nextInt(dimensions_);
-					// if (hasStructure_) {
-					childStDevs.get(child)[mutGene] *= Math.exp(learningRate1
-							* rnd_.nextGaussian() + learningRate2
-							* rnd_.nextGaussian());
-					childStDevs.get(child)[mutGene] = childStDevs.get(child)[mutGene] < minStDev ? minStDev
-							: childStDevs.get(child)[mutGene];
-					childParams.get(child)[mutGene] += (improv_ ? childStDevs
-							.get(child)[mutGene] * c2
-							: childStDevs.get(child)[mutGene] / c2)
-							* rnd_.nextGaussian();
-					childParams.get(child)[mutGene] = childParams.get(child)[mutGene] < -5 ? -5
-							: childParams.get(child)[mutGene] > 5 ? 5
-									: childParams.get(child)[mutGene];
-					// childParams.get(child)[mutGene] = -5
-					// + (10 * rnd_.nextDouble());
-					// } else {
-					// }
-				} else {
-					for (int gene = 0; gene < dimensions_; gene++) {
-						if (rnd_.nextDouble() < mutRate_) {
-							// if (hasStructure_) {
-							childStDevs.get(child)[gene] *= Math
-									.exp(learningRate1 * rnd_.nextGaussian()
-											+ learningRate2
-											* rnd_.nextGaussian());
-							childStDevs.get(child)[gene] = childStDevs
-									.get(child)[gene] < minStDev ? minStDev
-									: childStDevs.get(child)[gene];
-							childParams.get(child)[gene] += (improv_ ? childStDevs
-									.get(child)[mutGene] * c2
-									: childStDevs.get(child)[mutGene] / c2)
-									* rnd_.nextGaussian();
-							childParams.get(child)[gene] = childParams
-									.get(child)[gene] < -5 ? -5 : childParams
-									.get(child)[gene] > 5 ? 5 : childParams
-									.get(child)[gene];
-							// childParams.get(child)[gene] = -5
-							// + (10 * rnd_.nextDouble());
-							// } else {
-							// }
-						}
+				for (int gene = 0; gene < dimensions_; gene++) {
+					if (rnd_.nextDouble() < varMutRate) {
+						// if (hasStructure_) {
+						childStDevs.get(child)[gene] *= Math.exp(learningRate1
+								* rnd_.nextGaussian() + learningRate2
+								* rnd_.nextGaussian());
+						childStDevs.get(child)[gene] = childStDevs.get(child)[gene] < minStDev ? minStDev
+								: childStDevs.get(child)[gene];
+						childParams.get(child)[gene] += (improv_ ? childStDevs
+								.get(child)[gene] * c2
+								: childStDevs.get(child)[gene] / c2)
+								* rnd_.nextGaussian();
+						childParams.get(child)[gene] = childParams.get(child)[gene] < -5 ? -5
+								: childParams.get(child)[gene] > 5 ? 5
+										: childParams.get(child)[gene];
+						// childParams.get(child)[gene] = -5
+						// + (10 * rnd_.nextDouble());
+						// } else {
+						// }
 					}
 				}
 			}
@@ -287,7 +272,6 @@ public class player20 implements ContestSubmission {
 			List<Candidate> parents) {
 		Candidate oldestC = null;
 		int oldest = Integer.MAX_VALUE;
-		// int numOldRemoved = 1;
 		int exception = 1;
 
 		// Add children to the population
@@ -298,7 +282,7 @@ public class player20 implements ContestSubmission {
 		// Sort population by fitness
 		Collections.sort(population_);
 
-		if (isMultimodal_) {
+		if (isMultimodal_ && (generation_ % 10 == 0)) {
 			while (population_.size() > population_size_) {
 				oldest = Integer.MAX_VALUE;
 				for (Candidate c : population_) {
@@ -309,43 +293,21 @@ public class player20 implements ContestSubmission {
 				}
 				population_.remove(oldestC);
 			}
+		} else if (isMultimodal_) {
+			while (population_.size() > population_size_) {
+				population_.remove(0);
+			}
 		} else {
 			while (population_.size() > population_size_) {
 				population_
 						.remove(rnd_.nextInt(population_.size() - exception));
 			}
 		}
-
-		// // delete the numOldRemoved oldest
-		// if (isMultimodal_ && generation_ % 10 == 0) {
-		// for (int old = 0; old < numOldRemoved
-		// && population_.size() > population_size_; old++) {
-		// oldest = Integer.MAX_VALUE;
-		// for (Candidate c : population_) {
-		// if (c.getGeneration() <= oldest) {
-		// oldest = c.getGeneration();
-		// oldestC = c;
-		// }
-		// }
-		// population_.remove(oldestC);
-		// }
-		// }
-		//
-		// // Randomly remove candidates (best candidate excluded)
-		// while (population_.size() > population_size_) {
-		// population_.remove(rnd_.nextInt(population_.size() - exception));
-		// }
 	}
 
 	private void evaluatePopulation() {
 		prevAvgFitness_ = avgFitness_;
 		avgFitness_ = getAverageFitness();
-
-		if (avgFitness_ == prevAvgFitness_) {
-			singleMut_ = true;
-		} else {
-			singleMut_ = false;
-		}
 
 		if (generation_ % 10 == 0) {
 			prevBestFitness_ = bestFitness_;
@@ -356,9 +318,9 @@ public class player20 implements ContestSubmission {
 			} else {
 				improv_ = false;
 			}
-			// System.out.println("Generation: " + generation_ + " Average: "
-			// + avgFitness_ + " Best: " + bestFitness_ + " Improvement? "
-			// + (improv_ ? true : ""));
+			System.out.println("Generation: " + generation_ + " Average: "
+					+ avgFitness_ + " Best: " + bestFitness_ + " Improvement? "
+					+ (improv_ ? true : ""));
 		}
 		generation_++;
 	}
@@ -402,6 +364,7 @@ public class player20 implements ContestSubmission {
 			// population evaluation
 			evaluatePopulation();
 		}
+
 		System.out.println(population_);
 		System.out.println("Final result: " + evaluation_.getFinalResult());
 		System.out.println("Duration: " + (System.currentTimeMillis() - start)
